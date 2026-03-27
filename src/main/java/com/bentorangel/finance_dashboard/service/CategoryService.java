@@ -7,6 +7,7 @@ import com.bentorangel.finance_dashboard.exception.ResourceNotFoundException;
 import com.bentorangel.finance_dashboard.model.Category;
 import com.bentorangel.finance_dashboard.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CategoryService {
@@ -51,6 +53,22 @@ public class CategoryService {
     public void delete(UUID id) {
         Category category = getCategoryEntity(id);
         categoryRepository.delete(category);
+    }
+
+    @Transactional
+    public CategoryResponseDTO update(UUID id, CategoryRequestDTO dto) {
+        Category category = getCategoryEntity(id);
+
+        // Se está mudando o nome, verifica se o novo nome já não pertence a OUTRA categoria
+        if (!category.getName().equalsIgnoreCase(dto.name()) &&
+                categoryRepository.existsByNameIgnoreCase(dto.name())) {
+            throw new BusinessException("Já existe outra categoria com o nome: " + dto.name());
+        }
+
+        category.setName(dto.name());
+        category.setType(dto.type());
+
+        return toResponseDTO(categoryRepository.save(category));
     }
 
     // --- Métodos Auxiliares Internos ---

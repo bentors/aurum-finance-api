@@ -12,4 +12,6 @@ import java.util.UUID;
 public interface CategoryRepository extends JpaRepository<Category, UUID> {
 
     Page<Category> findAll(Pageable pageable);
+
+    boolean existsByNameIgnoreCase(String name);
 }

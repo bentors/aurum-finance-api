@@ -1,6 +1,9 @@
 package com.bentorangel.finance_dashboard.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.SQLRestriction;
@@ -31,15 +34,20 @@ public class Transaction {
     @EqualsAndHashCode.Include
     private UUID id;
 
+    @NotBlank(message = "A descrição é obrigatória")
     @Column(nullable = false)
     private String description;
 
+    @NotNull(message = "O valor é obrigatório")
+    @Positive(message = "O valor deve ser maior que zero") // Garante que não entra valor negativo (o tipo Despesa/Receita é que dita o sinal)
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal amount;
 
+    @NotNull(message = "A data da transação é obrigatória")
     @Column(name = "transaction_date", nullable = false)
     private LocalDate transactionDate;
 
+    @NotNull(message = "A categoria é obrigatória")
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id", nullable = false)
     private Category category;
@@ -55,4 +63,7 @@ public class Transaction {
     @Builder.Default
     @Column(nullable = false)
     private boolean active = true;
+
+    @Version
+    private Long version;
 }

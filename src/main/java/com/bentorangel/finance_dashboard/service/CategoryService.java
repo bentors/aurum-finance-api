@@ -24,7 +24,7 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
 
-    // --- Truque de Mágica: Pega o usuário logado no momento da requisição ---
+    // Pega o usuário logado no momento da requisição
     private User getCurrentUser() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
     }
@@ -40,7 +40,7 @@ public class CategoryService {
         Category category = Category.builder()
                 .name(dto.name())
                 .type(dto.type())
-                .user(user) // Carimbamos quem é o dono!
+                .user(user)
                 .build();
 
         return toResponseDTO(categoryRepository.save(category));
@@ -79,7 +79,7 @@ public class CategoryService {
         return toResponseDTO(categoryRepository.save(category));
     }
 
-    // Busca blindada: Só acha se for do usuário logado!
+    // Só acha se for do usuário logado!
     public Category getCategoryEntity(UUID id) {
         return categoryRepository.findByIdAndUser(id, getCurrentUser())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada ou não pertence a você."));

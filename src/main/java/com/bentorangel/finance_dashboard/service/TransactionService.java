@@ -18,6 +18,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -90,6 +91,7 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
+    @Cacheable(value = "dashboardSummary", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '-' + #startDate + '-' + #endDate")
     public DashboardSummaryDTO getSummary(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new BusinessException("A data de início não pode ser posterior à data de fim.");

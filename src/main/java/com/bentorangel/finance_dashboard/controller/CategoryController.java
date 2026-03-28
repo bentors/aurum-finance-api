@@ -3,6 +3,7 @@ package com.bentorangel.finance_dashboard.controller;
 import com.bentorangel.finance_dashboard.dto.CategoryRequestDTO;
 import com.bentorangel.finance_dashboard.dto.CategoryResponseDTO;
 import com.bentorangel.finance_dashboard.service.CategoryService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -18,6 +19,7 @@ import java.util.UUID;
 @RestController // Diz que essa classe vai responder requisições da web com JSON
 @RequestMapping("/api/v1/categories") // O endereço base no navegador
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class CategoryController {
 
     private final CategoryService categoryService;

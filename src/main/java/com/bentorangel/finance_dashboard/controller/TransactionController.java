@@ -4,6 +4,7 @@ import com.bentorangel.finance_dashboard.dto.DashboardSummaryDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionRequestDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionResponseDTO;
 import com.bentorangel.finance_dashboard.service.TransactionService;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -21,6 +22,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/transactions")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "bearerAuth")
 public class TransactionController {
 
     private final TransactionService transactionService;

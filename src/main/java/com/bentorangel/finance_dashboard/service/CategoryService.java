@@ -5,11 +5,13 @@ import com.bentorangel.finance_dashboard.dto.CategoryResponseDTO;
 import com.bentorangel.finance_dashboard.exception.BusinessException;
 import com.bentorangel.finance_dashboard.exception.ResourceNotFoundException;
 import com.bentorangel.finance_dashboard.model.Category;
+import com.bentorangel.finance_dashboard.model.User;
 import com.bentorangel.finance_dashboard.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,31 +24,37 @@ public class CategoryService {
 
     private final CategoryRepository categoryRepository;
 
+    // --- Truque de Mágica: Pega o usuário logado no momento da requisição ---
+    private User getCurrentUser() {
+        return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+    }
+
     @Transactional
     public CategoryResponseDTO create(CategoryRequestDTO dto) {
-        if (categoryRepository.existsByNameIgnoreCase(dto.name())) {
-            throw new BusinessException("Já existe uma categoria com o nome: " + dto.name());
+        User user = getCurrentUser();
+
+        if (categoryRepository.existsByNameIgnoreCaseAndUser(dto.name(), user)) {
+            throw new BusinessException("Você já possui uma categoria com o nome: " + dto.name());
         }
-        // Converte o DTO que veio da web em uma Entidade para o banco
+
         Category category = Category.builder()
                 .name(dto.name())
                 .type(dto.type())
+                .user(user) // Carimbamos quem é o dono!
                 .build();
 
-        Category savedCategory = categoryRepository.save(category);
-        return toResponseDTO(savedCategory);
+        return toResponseDTO(categoryRepository.save(category));
     }
 
-    @Transactional(readOnly = true) // Melhora a performance de buscas
+    @Transactional(readOnly = true)
     public Page<CategoryResponseDTO> findAll(Pageable pageable) {
-        return categoryRepository.findAll(pageable)
+        return categoryRepository.findAllByUser(getCurrentUser(), pageable)
                 .map(this::toResponseDTO);
     }
 
     @Transactional(readOnly = true)
     public CategoryResponseDTO findById(UUID id) {
-        Category category = getCategoryEntity(id);
-        return toResponseDTO(category);
+        return toResponseDTO(getCategoryEntity(id));
     }
 
     @Transactional
@@ -57,12 +65,12 @@ public class CategoryService {
 
     @Transactional
     public CategoryResponseDTO update(UUID id, CategoryRequestDTO dto) {
+        User user = getCurrentUser();
         Category category = getCategoryEntity(id);
 
-        // Se está mudando o nome, verifica se o novo nome já não pertence a OUTRA categoria
         if (!category.getName().equalsIgnoreCase(dto.name()) &&
-                categoryRepository.existsByNameIgnoreCase(dto.name())) {
-            throw new BusinessException("Já existe outra categoria com o nome: " + dto.name());
+                categoryRepository.existsByNameIgnoreCaseAndUser(dto.name(), user)) {
+            throw new BusinessException("Você já possui outra categoria com o nome: " + dto.name());
         }
 
         category.setName(dto.name());
@@ -71,20 +79,13 @@ public class CategoryService {
         return toResponseDTO(categoryRepository.save(category));
     }
 
-    // --- Métodos Auxiliares Internos ---
-
-    // Busca a entidade real no banco
+    // Busca blindada: Só acha se for do usuário logado!
     public Category getCategoryEntity(UUID id) {
-        return categoryRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada para o ID: " + id));
+        return categoryRepository.findByIdAndUser(id, getCurrentUser())
+                .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada ou não pertence a você."));
     }
 
-    // Mapeador manual Entidade -> DTO
     private CategoryResponseDTO toResponseDTO(Category category) {
-        return new CategoryResponseDTO(
-                category.getId(),
-                category.getName(),
-                category.getType()
-        );
+        return new CategoryResponseDTO(category.getId(), category.getName(), category.getType());
     }
 }

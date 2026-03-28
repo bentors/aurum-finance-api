@@ -13,6 +13,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -34,4 +35,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("endDate") LocalDate endDate,
             @Param("user") User user
     );
+    @EntityGraph(attributePaths = {"category"})
+    List<Transaction> findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(User user, LocalDate startDate, LocalDate endDate);
 }

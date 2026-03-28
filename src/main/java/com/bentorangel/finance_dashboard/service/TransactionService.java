@@ -22,7 +22,9 @@ import org.springframework.cache.annotation.Cacheable;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 
 @Slf4j
 @Service
@@ -129,4 +131,38 @@ public class TransactionService {
                 )
         );
     }
-}
+
+    @Transactional(readOnly = true)
+    public byte[] exportTransactionsToCsv(LocalDate startDate, LocalDate endDate) {
+        if (startDate.isAfter(endDate)) {
+            throw new BusinessException("A data de início não pode ser posterior à data de fim.");
+        }
+
+        User user = getCurrentUser();
+        List<Transaction> transactions = transactionRepository.findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(user, startDate, endDate);
+
+        StringBuilder csvBuilder = new StringBuilder();
+
+        // 1. Monta o Cabeçalho
+        csvBuilder.append("Data;Descrição;Categoria;Tipo;Valor\n");
+
+        // 2. Preenche as linhas com os dados
+        for (Transaction t : transactions) {
+            csvBuilder.append(t.getTransactionDate()).append(";")
+                    .append("\"").append(t.getDescription()).append("\";") // Aspas protegem a descrição
+                    .append(t.getCategory().getName()).append(";")
+                    .append(t.getCategory().getType()).append(";")
+                    .append(t.getAmount().toString().replace(".", ",")).append("\n"); // Valor com vírgula (R$)
+        }
+
+        // BOM (Byte Order Mark) do UTF-8.
+        byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
+        byte[] csvBytes = csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+
+        byte[] finalBytes = new byte[bom.length + csvBytes.length];
+        System.arraycopy(bom, 0, finalBytes, 0, bom.length);
+        System.arraycopy(csvBytes, 0, finalBytes, bom.length, csvBytes.length);
+
+        return finalBytes;
+    }
+    }

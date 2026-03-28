@@ -11,6 +11,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -74,5 +75,21 @@ public class TransactionController {
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
         return ResponseEntity.ok(transactionService.getSummary(startDate, endDate));
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> exportToCsv(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        byte[] csvData = transactionService.exportTransactionsToCsv(startDate, endDate);
+
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.add(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=extrato_" + startDate + "_a_" + endDate + ".csv");
+        headers.add(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=ISO-8859-1");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(csvData);
     }
 }

@@ -47,7 +47,7 @@ class CategoryServiceTest {
         // 2. Criamos o DTO que o Front-end enviaria
         requestDTO = new CategoryRequestDTO("Salário", CategoryType.INCOME);
 
-        // 3. O Truque Mágico: Colocamos o usuário de mentira logado no Spring Security!
+        // 3. Colocamos o usuário de mentira logado no Spring Security!
         Authentication authentication = mock(Authentication.class);
         SecurityContext securityContext = mock(SecurityContext.class);
         when(securityContext.getAuthentication()).thenReturn(authentication);
@@ -247,7 +247,7 @@ class CategoryServiceTest {
         assertNotNull(result);
         assertEquals(CategoryType.INCOME, existingCategory.getType()); // Confirma que o tipo mudou
 
-        // Garante que o método do repositório que checa nome NUNCA foi chamado (economizou banco!)
+        // Garante que o metodo do repositório que checa nome NUNCA foi chamado
         verify(categoryRepository, never()).existsByNameIgnoreCaseAndUser(anyString(), any(User.class));
         verify(categoryRepository, times(1)).save(existingCategory);
     }

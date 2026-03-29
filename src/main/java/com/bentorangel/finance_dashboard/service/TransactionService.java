@@ -108,11 +108,6 @@ public class TransactionService {
         return new DashboardSummaryDTO(totalIncome, totalExpense, balance);
     }
 
-    // Busca blindada por usuário
-    private Transaction entityOrThrow(UUID id) {
-        return getTransactionEntity(id);
-    }
-
     private Transaction getTransactionEntity(UUID id) {
         return transactionRepository.findByIdAndUser(id, getCurrentUser())
                 .orElseThrow(() -> new ResourceNotFoundException("Transação não encontrada ou não pertence a você."));

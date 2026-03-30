@@ -14,6 +14,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.cache.annotation.CacheEvict;
 
 import java.util.UUID;
 
@@ -52,17 +54,20 @@ public class CategoryService {
                 .map(this::toResponseDTO);
     }
 
+    @Cacheable(value = "categoria", key = "#id")
     @Transactional(readOnly = true)
     public CategoryResponseDTO findById(UUID id) {
         return toResponseDTO(getCategoryEntity(id));
     }
 
+    @CacheEvict(value = "categoria", key = "#id")
     @Transactional
     public void delete(UUID id) {
         Category category = getCategoryEntity(id);
         categoryRepository.delete(category);
     }
 
+    @CacheEvict(value = "categoria", key = "#id")
     @Transactional
     public CategoryResponseDTO update(UUID id, CategoryRequestDTO dto) {
         User user = getCurrentUser();

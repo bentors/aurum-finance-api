@@ -30,6 +30,8 @@ public class SecurityConfig {
                         // Libera as rotas de login e registro
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()
+                        // Liberando as rotas de monitoramento
+                        .requestMatchers("/actuator/**").permitAll()
                         // Libera o Swagger
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**", "/swagger-ui.html").permitAll()
                         // Qualquer outra requisição precisa estar autenticada

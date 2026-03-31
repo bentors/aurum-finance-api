@@ -3,6 +3,7 @@ package com.bentorangel.finance_dashboard.config;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -24,9 +25,14 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return httpSecurity
+                // 1. ATIVANDO O CORS NA SEGURANÇA
+                .cors(Customizer.withDefaults())
                 .csrf(csrf -> csrf.disable()) // Desabilita proteção contra ataques de sessão (desnecessário com JWT)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // API REST não guarda sessão
                 .authorizeHttpRequests(authorize -> authorize
+                        // LIBERANDO O PREFLIGHT DO NAVEGADOR
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                         // Libera as rotas de login e registro
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/register").permitAll()

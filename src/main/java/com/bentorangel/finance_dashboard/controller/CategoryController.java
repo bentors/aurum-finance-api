@@ -6,8 +6,11 @@ import com.bentorangel.finance_dashboard.service.CategoryService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -36,7 +39,7 @@ public class CategoryController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<CategoryResponseDTO>> findAll(Pageable pageable) {
+    public ResponseEntity<Page<CategoryResponseDTO>> findAll(@ParameterObject @PageableDefault(sort = "name", direction = Sort.Direction.ASC) Pageable pageable) {
         Page<CategoryResponseDTO> response = categoryService.findAll(pageable);
         return ResponseEntity.ok(response); // Retorna 200 OK
     }

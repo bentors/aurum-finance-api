@@ -7,8 +7,11 @@ import com.bentorangel.finance_dashboard.service.TransactionService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
@@ -40,8 +43,10 @@ public class TransactionController {
     }
 
     @GetMapping
-    public ResponseEntity<Page<TransactionResponseDTO>> findAll(Pageable pageable) {
-        return ResponseEntity.ok(transactionService.findAll(pageable)); // 200 OK
+    public ResponseEntity<Page<TransactionResponseDTO>> findAll(
+            @ParameterObject
+            @PageableDefault(sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(transactionService.findAll(pageable));
     }
 
     @GetMapping("/{id}")
@@ -66,7 +71,8 @@ public class TransactionController {
     public ResponseEntity<Page<TransactionResponseDTO>> findByPeriod(
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            Pageable pageable) {
+            @ParameterObject
+            @PageableDefault(sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable) {
         return ResponseEntity.ok(transactionService.findByPeriod(startDate, endDate, pageable));
     }
 

@@ -9,6 +9,7 @@ import com.bentorangel.finance_dashboard.repository.UserRepository;
 import com.bentorangel.finance_dashboard.service.TokenService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -56,6 +57,6 @@ public class AuthController {
 
         userRepository.save(newUser);
 
-        return ResponseEntity.ok().build(); // 200 OK
+        return ResponseEntity.status(HttpStatus.CREATED).build(); // 201 Created
     }
 }

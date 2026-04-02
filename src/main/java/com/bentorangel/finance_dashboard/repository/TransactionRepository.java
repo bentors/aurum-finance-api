@@ -35,6 +35,43 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("endDate") LocalDate endDate,
             @Param("user") User user
     );
+
     @EntityGraph(attributePaths = {"category"})
     List<Transaction> findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(User user, LocalDate startDate, LocalDate endDate);
+
+    // 1. Filtro Avançado
+    // Se o parâmetro vier nulo do front-end, o banco ignora ele e foca nos outros!
+    @Query("SELECT t FROM Transaction t WHERE t.user = :user " +
+            "AND (:description IS NULL OR LOWER(t.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
+            "AND (:categoryId IS NULL OR t.category.id = :categoryId) " +
+            "AND (:type IS NULL OR t.category.type = :type)")
+    @EntityGraph(attributePaths = {"category"})
+    Page<Transaction> searchTransactions(
+            @Param("user") User user,
+            @Param("description") String description,
+            @Param("categoryId") UUID categoryId,
+            @Param("type") CategoryType type,
+            Pageable pageable
+    );
+
+    // 2. Sumário Mensal
+    @Query(value = "SELECT EXTRACT(MONTH FROM t.transaction_date) as month, " +
+            "SUM(CASE WHEN c.type = 'INCOME' THEN t.amount ELSE 0 END) as income, " +
+            "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0 END) as expense " +
+            "FROM transactions t " +
+            "JOIN categories c ON t.category_id = c.id " +
+            "WHERE t.user_id = :userId AND t.transaction_date >= :startDate " +
+            "GROUP BY EXTRACT(MONTH FROM t.transaction_date) " +
+            "ORDER BY month", nativeQuery = true)
+    List<MonthlySummaryProjection> getMonthlySummary(
+            @Param("userId") UUID userId,
+            @Param("startDate") LocalDate startDate
+    );
+
+    // Interface de Projeção: Tabela SQL acima e preenchida pelo Spring
+    interface MonthlySummaryProjection {
+        Integer getMonth();
+        BigDecimal getIncome();
+        BigDecimal getExpense();
+    }
 }

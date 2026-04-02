@@ -156,4 +156,15 @@ public class TransactionService {
 
         return csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
     }
+
+    @Transactional(readOnly = true)
+    public Page<TransactionResponseDTO> searchTransactions(String description, UUID categoryId, CategoryType type, Pageable pageable) {
+
+        User user = getCurrentUser();
+        // Chama o metodo nativo
+        Page<Transaction> transactions = transactionRepository.searchTransactions(
+                user, description, categoryId, type, pageable
+        );
+        return transactions.map(this::toResponseDTO);
     }
+}

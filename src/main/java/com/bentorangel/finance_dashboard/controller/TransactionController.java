@@ -3,6 +3,7 @@ package com.bentorangel.finance_dashboard.controller;
 import com.bentorangel.finance_dashboard.dto.DashboardSummaryDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionRequestDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionResponseDTO;
+import com.bentorangel.finance_dashboard.model.CategoryType;
 import com.bentorangel.finance_dashboard.service.TransactionService;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -97,5 +98,16 @@ public class TransactionController {
         return ResponseEntity.ok()
                 .headers(headers)
                 .body(csvData);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<Page<TransactionResponseDTO>> search(
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) UUID categoryId,
+            @RequestParam(required = false) CategoryType type,
+            @ParameterObject @PageableDefault(sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable) {
+
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, pageable);
+        return ResponseEntity.ok(result);
     }
 }

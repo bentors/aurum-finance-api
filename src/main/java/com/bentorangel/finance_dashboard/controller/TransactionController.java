@@ -115,9 +115,10 @@ public class TransactionController {
 
     @GetMapping("/summary/monthly")
     public ResponseEntity<List<MonthlySummaryDTO>> getMonthlySummary(
-            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
+            @RequestParam(required = false) Integer year) {
 
-        List<MonthlySummaryDTO> result = transactionService.getMonthlySummary(year);
+        int resolvedYear = (year != null) ? year : LocalDate.now().getYear();
+        List<MonthlySummaryDTO> result = transactionService.getMonthlySummary(resolvedYear);
         return ResponseEntity.ok(result);
     }
 }

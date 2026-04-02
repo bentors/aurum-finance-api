@@ -24,7 +24,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**") // Libera todos os endpoints da API
                 .allowedOrigins("http://localhost:5173", "http://localhost:3000") // Permite outras portas locais
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "TRACE", "CONNECT") // Todos os métodos essenciais
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD") // Todos os métodos essenciais
                 .allowedHeaders("*") // Libera todos os cabeçalhos
                 .allowCredentials(true); // Permite envio do Token JWT
     }

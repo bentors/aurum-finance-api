@@ -60,7 +60,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0 END) as expense " +
             "FROM transactions t " +
             "JOIN categories c ON t.category_id = c.id " +
-            "WHERE t.user_id = :userId AND t.transaction_date >= :startDate " +
+            "WHERE t.user_id = :userId " +
+            "AND t.transaction_date >= :startDate " +
+            "AND t.active = true " +
+            "AND c.active = true " +
             "GROUP BY EXTRACT(MONTH FROM t.transaction_date) " +
             "ORDER BY month", nativeQuery = true)
     List<MonthlySummaryProjection> getMonthlySummary(

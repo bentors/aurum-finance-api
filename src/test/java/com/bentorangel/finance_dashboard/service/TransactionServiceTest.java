@@ -335,4 +335,59 @@ class TransactionServiceTest {
 
         assertEquals("A data de início não pode ser posterior à data de fim.", exception.getMessage());
     }
+
+    @Test
+    @DisplayName("Deve abortar criação se a categoria for de outro usuário ou não existir")
+    void create_ThrowsException_WhenCategoryIsInvalid() {
+        // Arrange
+        // Simula o CategoryService barrando a requisição e lançando o erro
+        when(categoryService.getCategoryEntity(requestDTO.categoryId()))
+                .thenThrow(new com.bentorangel.finance_dashboard.exception.ResourceNotFoundException("Categoria não encontrada."));
+
+        // Act & Assert
+        assertThrows(com.bentorangel.finance_dashboard.exception.ResourceNotFoundException.class,
+                () -> transactionService.create(requestDTO));
+
+        // Verificação CRÍTICA: Garante que o metodo save() do banco de dados NUNCA foi chamado
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Deve retornar tudo ZERO no Dashboard se não houver transações no mês (Proteção Null-Safe)")
+    void getSummary_ReturnsZeros_WhenNoTransactionsFound() {
+        // Arrange
+        LocalDate startDate = LocalDate.of(2026, 3, 1);
+        LocalDate endDate = LocalDate.of(2026, 3, 31);
+
+        // Simula o JPA retornando null (que é o comportamento real do SUM quando a tabela está vazia)
+        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, mockUser))
+                .thenReturn(null);
+
+        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, mockUser))
+                .thenReturn(null);
+
+        // Act
+        DashboardSummaryDTO summary = transactionService.getSummary(startDate, endDate);
+
+        // Assert
+        assertNotNull(summary);
+        // Garante o seu Service converteu o 'null' do banco para 'BigDecimal.ZERO'
+        assertEquals(BigDecimal.ZERO, summary.totalIncome());
+        assertEquals(BigDecimal.ZERO, summary.totalExpense());
+        assertEquals(BigDecimal.ZERO, summary.balance());
+    }
+    @Test
+    @DisplayName("Deve lançar exceção ao tentar atualizar transação de outro usuário ou inexistente")
+    void update_ThrowsException_WhenTransactionNotFound() {
+        // Arrange
+        UUID fakeId = UUID.randomUUID();
+        when(transactionRepository.findByIdAndUser(fakeId, mockUser)).thenReturn(java.util.Optional.empty());
+
+        // Act & Assert
+        assertThrows(com.bentorangel.finance_dashboard.exception.ResourceNotFoundException.class,
+                () -> transactionService.update(fakeId, requestDTO));
+
+        // Garante que não tentou salvar nada
+        verify(transactionRepository, never()).save(any());
+    }
 }

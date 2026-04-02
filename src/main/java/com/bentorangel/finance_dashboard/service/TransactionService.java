@@ -101,8 +101,12 @@ public class TransactionService {
 
         User user = getCurrentUser();
 
-        BigDecimal totalIncome = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, user);
-        BigDecimal totalExpense = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, user);
+        BigDecimal rawIncome = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, user);
+        BigDecimal rawExpense = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, user);
+
+        BigDecimal totalIncome = rawIncome != null ? rawIncome : BigDecimal.ZERO;
+        BigDecimal totalExpense = rawExpense != null ? rawExpense : BigDecimal.ZERO;
+
         BigDecimal balance = totalIncome.subtract(totalExpense);
 
         return new DashboardSummaryDTO(totalIncome, totalExpense, balance);
@@ -150,7 +154,6 @@ public class TransactionService {
                     .append(t.getAmount().toString().replace(".", ",")).append("\n"); // Valor com vírgula (R$)
         }
 
-        // BOM (Byte Order Mark) do UTF-8.
         return csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
     }
     }

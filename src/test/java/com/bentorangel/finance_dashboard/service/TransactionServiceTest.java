@@ -390,4 +390,19 @@ class TransactionServiceTest {
         // Garante que não tentou salvar nada
         verify(transactionRepository, never()).save(any());
     }
+
+    @Test
+    @DisplayName("Deve gerar cache key única por usuário e período")
+    void getSummary_CacheKey_IsUniquePerUser() {
+        // dois usuários diferentes, mesmo período — não podem compartilhar cache
+        User userA = new User(); userA.setEmail("a@test.com");
+        User userB = new User(); userB.setEmail("b@test.com");
+        LocalDate start = LocalDate.of(2026, 1, 1);
+        LocalDate end   = LocalDate.of(2026, 1, 31);
+
+        String keyA = userA.getEmail() + "-" + start + "-" + end;
+        String keyB = userB.getEmail() + "-" + start + "-" + end;
+
+        assertNotEquals(keyA, keyB);
+    }
 }

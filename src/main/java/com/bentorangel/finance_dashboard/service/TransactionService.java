@@ -30,6 +30,7 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final CategoryService categoryService;
+    private final TransactionCacheService transactionCacheService;
 
     private User getCurrentUser() {
         return (User) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -47,7 +48,9 @@ public class TransactionService {
                 .user(getCurrentUser())
                 .build();
 
-        return toResponseDTO(transactionRepository.save(transaction));
+        TransactionResponseDTO response = toResponseDTO(transactionRepository.save(transaction));
+        transactionCacheService.evictSummaryCache(); // invalida após salvar
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -66,7 +69,9 @@ public class TransactionService {
         transaction.setTransactionDate(dto.transactionDate());
         transaction.setCategory(category);
 
-        return toResponseDTO(transactionRepository.save(transaction));
+        TransactionResponseDTO response = toResponseDTO(transactionRepository.save(transaction));
+        transactionCacheService.evictSummaryCache(); // invalida após atualizar
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -78,6 +83,7 @@ public class TransactionService {
     public void delete(UUID id) {
         Transaction transaction = getTransactionEntity(id);
         transactionRepository.delete(transaction);
+        transactionCacheService.evictSummaryCache();
     }
 
     @Transactional(readOnly = true)
@@ -90,23 +96,12 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
-    @Cacheable(value = "dashboardSummary", key = "T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName() + '-' + #startDate + '-' + #endDate")
     public DashboardSummaryDTO getSummary(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
             throw new BusinessException("A data de início não pode ser posterior à data de fim.");
         }
-
         User user = getCurrentUser();
-
-        BigDecimal rawIncome = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, user);
-        BigDecimal rawExpense = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, user);
-
-        BigDecimal totalIncome = rawIncome != null ? rawIncome : BigDecimal.ZERO;
-        BigDecimal totalExpense = rawExpense != null ? rawExpense : BigDecimal.ZERO;
-
-        BigDecimal balance = totalIncome.subtract(totalExpense);
-
-        return new DashboardSummaryDTO(totalIncome, totalExpense, balance);
+        return transactionCacheService.getSummary(user.getUsername(), startDate, endDate, user);
     }
 
     private Transaction getTransactionEntity(UUID id) {

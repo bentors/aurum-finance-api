@@ -40,7 +40,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     List<Transaction> findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(User user, LocalDate startDate, LocalDate endDate);
 
     // 1. Filtro Avançado
-    // Se o parâmetro vier nulo do front-end, o banco ignora ele e foca nos outros!
+    // Se o parâmetro vier nulo do front-end, o banco ignora ele e foca nos outros
     @Query("SELECT t FROM Transaction t WHERE t.user = :user " +
             "AND (:description IS NULL OR LOWER(t.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
             "AND (:categoryId IS NULL OR t.category.id = :categoryId) " +

@@ -151,13 +151,6 @@ public class TransactionService {
         }
 
         // BOM (Byte Order Mark) do UTF-8.
-        byte[] bom = new byte[]{(byte) 0xEF, (byte) 0xBB, (byte) 0xBF};
-        byte[] csvBytes = csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
-
-        byte[] finalBytes = new byte[bom.length + csvBytes.length];
-        System.arraycopy(bom, 0, finalBytes, 0, bom.length);
-        System.arraycopy(csvBytes, 0, finalBytes, bom.length, csvBytes.length);
-
-        return finalBytes;
+        return csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
     }
     }

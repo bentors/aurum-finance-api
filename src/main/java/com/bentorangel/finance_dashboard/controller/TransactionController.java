@@ -1,6 +1,7 @@
 package com.bentorangel.finance_dashboard.controller;
 
 import com.bentorangel.finance_dashboard.dto.DashboardSummaryDTO;
+import com.bentorangel.finance_dashboard.dto.MonthlySummaryDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionRequestDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionResponseDTO;
 import com.bentorangel.finance_dashboard.model.CategoryType;
@@ -22,6 +23,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -108,6 +110,14 @@ public class TransactionController {
             @ParameterObject @PageableDefault(sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable) {
 
         Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, pageable);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/summary/monthly")
+    public ResponseEntity<List<MonthlySummaryDTO>> getMonthlySummary(
+            @RequestParam(defaultValue = "#{T(java.time.LocalDate).now().getYear()}") int year) {
+
+        List<MonthlySummaryDTO> result = transactionService.getMonthlySummary(year);
         return ResponseEntity.ok(result);
     }
 }

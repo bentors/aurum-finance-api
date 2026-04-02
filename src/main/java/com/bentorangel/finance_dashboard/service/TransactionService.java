@@ -1,9 +1,6 @@
 package com.bentorangel.finance_dashboard.service;
 
-import com.bentorangel.finance_dashboard.dto.CategoryResponseDTO;
-import com.bentorangel.finance_dashboard.dto.DashboardSummaryDTO;
-import com.bentorangel.finance_dashboard.dto.TransactionRequestDTO;
-import com.bentorangel.finance_dashboard.dto.TransactionResponseDTO;
+import com.bentorangel.finance_dashboard.dto.*;
 import com.bentorangel.finance_dashboard.exception.BusinessException;
 import com.bentorangel.finance_dashboard.exception.ResourceNotFoundException;
 import com.bentorangel.finance_dashboard.model.Category;
@@ -166,5 +163,24 @@ public class TransactionService {
                 user, description, categoryId, type, pageable
         );
         return transactions.map(this::toResponseDTO);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MonthlySummaryDTO> getMonthlySummary(int year) {
+        User user = getCurrentUser();
+
+        // Define o primeiro dia do ano que o usuário quer ver
+        LocalDate startOfYear = LocalDate.of(year, 1, 1);
+
+        var projections = transactionRepository.getMonthlySummary(user.getId(), startOfYear);
+
+        // Converte o resultado do banco para a nossa lista de DTOs
+        return projections.stream()
+                .map(p -> new MonthlySummaryDTO(
+                        p.getMonth(),
+                        p.getIncome() != null ? p.getIncome() : BigDecimal.ZERO,
+                        p.getExpense() != null ? p.getExpense() : BigDecimal.ZERO
+                ))
+                .toList();
     }
 }

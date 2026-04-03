@@ -16,12 +16,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -34,8 +39,11 @@ class TransactionServiceTest {
     @Mock
     private TransactionRepository transactionRepository;
 
-    @Mock // Precisamos mockar o CategoryService também!
+    @Mock
     private CategoryService categoryService;
+
+    @Mock
+    private TransactionCacheService transactionCacheService;
 
     @InjectMocks
     private TransactionService transactionService;
@@ -109,25 +117,23 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve calcular o resumo financeiro (Dashboard) com sucesso")
     void getSummary_Success() {
-        // Arrange
         LocalDate startDate = LocalDate.of(2026, 3, 1);
-        LocalDate endDate = LocalDate.of(2026, 3, 31);
+        LocalDate endDate   = LocalDate.of(2026, 3, 31);
 
-        // Simulamos o banco devolvendo 5000 de receita e 2000 de despesa
-        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, mockUser))
-                .thenReturn(new BigDecimal("5000.00"));
+        DashboardSummaryDTO expected = new DashboardSummaryDTO(
+                new BigDecimal("5000.00"),
+                new BigDecimal("2000.00"),
+                new BigDecimal("3000.00")
+        );
 
-        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, mockUser))
-                .thenReturn(new BigDecimal("2000.00"));
+        when(transactionCacheService.getSummary(mockUser.getUsername(), startDate, endDate, mockUser))
+                .thenReturn(expected);
 
-        // Act
         DashboardSummaryDTO summary = transactionService.getSummary(startDate, endDate);
 
-        // Assert
         assertNotNull(summary);
         assertEquals(new BigDecimal("5000.00"), summary.totalIncome());
         assertEquals(new BigDecimal("2000.00"), summary.totalExpense());
-        // O Java tem que saber calcular que 5000 - 2000 = 3000
         assertEquals(new BigDecimal("3000.00"), summary.balance());
     }
 
@@ -355,27 +361,26 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve retornar tudo ZERO no Dashboard se não houver transações no mês (Proteção Null-Safe)")
     void getSummary_ReturnsZeros_WhenNoTransactionsFound() {
-        // Arrange
         LocalDate startDate = LocalDate.of(2026, 3, 1);
-        LocalDate endDate = LocalDate.of(2026, 3, 31);
+        LocalDate endDate   = LocalDate.of(2026, 3, 31);
 
-        // Simula o JPA retornando null (que é o comportamento real do SUM quando a tabela está vazia)
-        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME, startDate, endDate, mockUser))
-                .thenReturn(null);
+        DashboardSummaryDTO expected = new DashboardSummaryDTO(
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO
+        );
 
-        when(transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, mockUser))
-                .thenReturn(null);
+        when(transactionCacheService.getSummary(mockUser.getUsername(), startDate, endDate, mockUser))
+                .thenReturn(expected);
 
-        // Act
         DashboardSummaryDTO summary = transactionService.getSummary(startDate, endDate);
 
-        // Assert
         assertNotNull(summary);
-        // Garante o seu Service converteu o 'null' do banco para 'BigDecimal.ZERO'
         assertEquals(BigDecimal.ZERO, summary.totalIncome());
         assertEquals(BigDecimal.ZERO, summary.totalExpense());
         assertEquals(BigDecimal.ZERO, summary.balance());
     }
+
     @Test
     @DisplayName("Deve lançar exceção ao tentar atualizar transação de outro usuário ou inexistente")
     void update_ThrowsException_WhenTransactionNotFound() {
@@ -404,6 +409,112 @@ class TransactionServiceTest {
         String keyB = userB.getEmail() + "-" + start + "-" + end;
 
         assertNotEquals(keyA, keyB);
+    }
+
+    @Test
+    @DisplayName("Deve buscar transações com todos os filtros preenchidos")
+    void searchTransactions_WithAllFilters_Success() {
+        // Arrange
+        String description = "salário";
+        UUID categoryId = mockCategory.getId();
+        CategoryType type = CategoryType.INCOME;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Transaction transaction = new Transaction();
+        transaction.setId(UUID.randomUUID());
+        transaction.setDescription("Salário de Março");
+        transaction.setAmount(new BigDecimal("5000.00"));
+        transaction.setCategory(mockCategory);
+
+        Page<Transaction> mockPage = new PageImpl<>(List.of(transaction));
+
+        when(transactionRepository.searchTransactions(mockUser, description, categoryId, type, pageable))
+                .thenReturn(mockPage);
+
+        // Act
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        assertEquals("Salário de Março", result.getContent().get(0).description());
+        verify(transactionRepository, times(1)).searchTransactions(mockUser, description, categoryId, type, pageable);
+    }
+
+    @Test
+    @DisplayName("Deve buscar transações filtrando apenas por tipo")
+    void searchTransactions_WithTypeOnly_Success() {
+        // Arrange
+        CategoryType type = CategoryType.EXPENSE;
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Transaction transaction = new Transaction();
+        transaction.setId(UUID.randomUUID());
+        transaction.setDescription("Conta de Luz");
+        transaction.setAmount(new BigDecimal("200.00"));
+        transaction.setCategory(mockCategory);
+
+        Page<Transaction> mockPage = new PageImpl<>(List.of(transaction));
+
+        when(transactionRepository.searchTransactions(mockUser, null, null, type, pageable))
+                .thenReturn(mockPage);
+
+        // Act
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, null, type, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.getTotalElements());
+        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, null, type, pageable);
+    }
+
+    @Test
+    @DisplayName("Deve retornar todas as transações do usuário quando todos os filtros forem nulos")
+    void searchTransactions_WithNoFilters_ReturnsAll() {
+        // Arrange
+        Pageable pageable = PageRequest.of(0, 10);
+
+        Transaction t1 = new Transaction();
+        t1.setDescription("Transação 1");
+        t1.setAmount(new BigDecimal("100.00"));
+        t1.setCategory(mockCategory);
+
+        Transaction t2 = new Transaction();
+        t2.setDescription("Transação 2");
+        t2.setAmount(new BigDecimal("200.00"));
+        t2.setCategory(mockCategory);
+
+        Page<Transaction> mockPage = new PageImpl<>(List.of(t1, t2));
+
+        when(transactionRepository.searchTransactions(mockUser, null, null, null, pageable))
+                .thenReturn(mockPage);
+
+        // Act
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, null, null, pageable);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(2, result.getTotalElements());
+        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, null, null, pageable);
+    }
+
+    @Test
+    @DisplayName("Deve rejeitar busca com categoryId de outro usuário")
+    void searchTransactions_WithCategoryFromAnotherUser_ThrowsException() {
+        // Arrange
+        UUID foreignCategoryId = UUID.randomUUID(); // ID que não pertence ao mockUser
+        Pageable pageable = PageRequest.of(0, 10);
+
+        // O repositório não encontra nada — simula o comportamento do filtro por usuário na query
+        when(transactionRepository.searchTransactions(mockUser, null, foreignCategoryId, null, pageable))
+                .thenReturn(Page.empty());
+
+        // Act
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, foreignCategoryId, null, pageable);
+
+        // Assert
+        assertTrue(result.isEmpty()); // não lança exceção, simplesmente retorna vazio
+        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, foreignCategoryId, null, pageable);
     }
 
 }

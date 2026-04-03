@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
@@ -91,9 +92,10 @@ public class TransactionController {
 
         byte[] csvData = transactionService.exportTransactionsToCsv(startDate, endDate);
 
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.add(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=extrato_" + startDate + "_a_" + endDate + ".csv");
-        headers.add(org.springframework.http.HttpHeaders.CONTENT_TYPE, "text/csv; charset=ISO-8859-1");
+        HttpHeaders headers = new HttpHeaders();
+        headers.add(HttpHeaders.CONTENT_DISPOSITION,
+                "attachment; filename=extrato_" + startDate + "_a_" + endDate + ".csv");
+        headers.add(HttpHeaders.CONTENT_TYPE, "text/csv; charset=UTF-8");
 
         return ResponseEntity.ok()
                 .headers(headers)

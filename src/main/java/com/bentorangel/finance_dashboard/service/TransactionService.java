@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -126,24 +127,23 @@ public class TransactionService {
             throw new BusinessException("A data de início não pode ser posterior à data de fim.");
         }
 
-        User user = getCurrentUser();
-        List<Transaction> transactions = transactionRepository.findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(user, startDate, endDate);
+        List<Transaction> transactions = transactionRepository
+                .findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(
+                        getCurrentUser(), startDate, endDate
+                );
 
-        StringBuilder csvBuilder = new StringBuilder();
+        StringBuilder csv = new StringBuilder();
+        csv.append("Data;Descricao;Categoria;Tipo;Valor\n");
 
-        // 1. Monta o Cabeçalho
-        csvBuilder.append("Data;Descrição;Categoria;Tipo;Valor\n");
-
-        // 2. Preenche as linhas com os dados
         for (Transaction t : transactions) {
-            csvBuilder.append(t.getTransactionDate()).append(";")
-                    .append("\"").append(t.getDescription()).append("\";") // Aspas protegem a descrição
+            csv.append(t.getTransactionDate()).append(";")
+                    .append("\"").append(t.getDescription()).append("\";")
                     .append(t.getCategory().getName()).append(";")
                     .append(t.getCategory().getType()).append(";")
-                    .append(t.getAmount().toString().replace(".", ",")).append("\n"); // Valor com vírgula (R$)
+                    .append(t.getAmount().toString().replace(".", ",")).append("\n");
         }
 
-        return csvBuilder.toString().getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+        return csv.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     @Transactional(readOnly = true)

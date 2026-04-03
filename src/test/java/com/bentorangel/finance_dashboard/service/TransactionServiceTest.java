@@ -25,6 +25,7 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -283,11 +284,10 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve exportar transações para CSV perfeitamente")
+    @DisplayName("Deve exportar transações para CSV em UTF-8")
     void exportTransactionsToCsv_Success() {
-        // Arrange
         LocalDate startDate = LocalDate.of(2026, 3, 1);
-        LocalDate endDate = LocalDate.of(2026, 3, 31);
+        LocalDate endDate   = LocalDate.of(2026, 3, 31);
 
         Transaction transaction = new Transaction();
         transaction.setTransactionDate(LocalDate.of(2026, 3, 15));
@@ -295,22 +295,19 @@ class TransactionServiceTest {
         transaction.setAmount(new BigDecimal("150.50"));
         transaction.setCategory(mockCategory);
 
-        when(transactionRepository.findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(mockUser, startDate, endDate))
-                .thenReturn(java.util.List.of(transaction));
+        when(transactionRepository.findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(
+                mockUser, startDate, endDate))
+                .thenReturn(List.of(transaction));
 
-        // Act
-        byte[] resultBytes = transactionService.exportTransactionsToCsv(startDate, endDate);
+        byte[] result = transactionService.exportTransactionsToCsv(startDate, endDate);
 
-        // Assert
-        assertNotNull(resultBytes);
-        assertTrue(resultBytes.length > 0);
+        assertNotNull(result);
+        assertTrue(result.length > 0);
 
-        // Transforma os bytes de volta em String para lermos o conteúdo e conferir a formatação
-        String csvContent = new String(resultBytes, java.nio.charset.StandardCharsets.ISO_8859_1);
-
-        assertTrue(csvContent.contains("Data;Descrição;Categoria;Tipo;Valor")); // O Cabeçalho tá lá?
-        assertTrue(csvContent.contains("Compra de Teste")); // A descrição tá lá?
-        assertTrue(csvContent.contains("150,50")); // O Java trocou o PONTO pela VÍRGULA com sucesso?
+        String csv = new String(result, StandardCharsets.UTF_8);
+        assertTrue(csv.contains("Data;Descricao;Categoria;Tipo;Valor"));
+        assertTrue(csv.contains("Compra de Teste"));
+        assertTrue(csv.contains("150,50"));
     }
 
     @Test

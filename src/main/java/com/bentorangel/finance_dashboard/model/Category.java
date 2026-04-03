@@ -23,7 +23,7 @@ import java.util.UUID;
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true) // Compara objetos APENAS pelo ID
 @EntityListeners(AuditingEntityListener.class) // Liga o radar do Spring para preencher datas
-@SQLDelete(sql = "UPDATE categories SET active = false WHERE id = ?")
+@SQLDelete(sql = "UPDATE categories SET active = false WHERE id = ? AND version = ?")
 @SQLRestriction("active = true") // Toda busca (SELECT) vai ignorar automaticamente os inativos
 public class Category {
 

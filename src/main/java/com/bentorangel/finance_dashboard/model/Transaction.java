@@ -25,7 +25,7 @@ import java.util.UUID;
 @Builder
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @EntityListeners(AuditingEntityListener.class)
-@SQLDelete(sql = "UPDATE transactions SET active = false WHERE id = ?")
+@SQLDelete(sql = "UPDATE transactions SET active = false WHERE id = ? AND version = ?")
 @SQLRestriction("active = true")
 public class Transaction {
 

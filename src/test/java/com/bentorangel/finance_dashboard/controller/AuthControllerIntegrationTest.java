@@ -2,6 +2,8 @@ package com.bentorangel.finance_dashboard.controller;
 
 import com.bentorangel.finance_dashboard.dto.LoginDTO; // <-- Aqui está o nome correto!
 import com.bentorangel.finance_dashboard.dto.RegisterDTO;
+import com.bentorangel.finance_dashboard.model.User;
+import com.bentorangel.finance_dashboard.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -9,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,12 +20,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest// Sobe a API inteira de verdade (Controllers, Services, Banco de Dados)
+@ActiveProfiles("test")
 @AutoConfigureMockMvc // Cria o nosso "Postman/Swagger" interno
 @Transactional // Ao final de cada teste, ele dá um rollback no banco, apagando tudo que o teste criou!
 class AuthControllerIntegrationTest {
 
     @Autowired
     private MockMvc mockMvc; // requisições HTTP
+
+    @Autowired
+    private UserRepository userRepository;
 
     private ObjectMapper objectMapper = new ObjectMapper(); // A ferramenta que transforma objetos Java em JSON
 
@@ -39,7 +46,7 @@ class AuthControllerIntegrationTest {
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(jsonPayload))
-                .andExpect(status().isOk()); // Esperamos que a API devolva um 200 OK
+                .andExpect(status().isCreated()); // Esperamos que a API devolva um 201 OK
     }
 
     @Test
@@ -65,22 +72,22 @@ class AuthControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Deve retornar status 400 (Bad Request) ao tentar registrar e-mail que já existe")
+    @DisplayName("Deve falhar ao tentar registrar um e-mail que já existe")
     void register_Fails_WhenEmailAlreadyExists() throws Exception {
-        // Arrange: Prepara e cadastra o primeiro usuário
-        RegisterDTO registerDTO = new RegisterDTO("Bento Clone", "clone@teste.com", "senha123");
-        String jsonPayload = objectMapper.writeValueAsString(registerDTO);
+        User existingUser = User.builder()
+                .name("Usuário Original")
+                .email("clone@teste.com")
+                .password("senhaCriptografada")
+                .active(true)
+                .build();
+        userRepository.save(existingUser);
+        RegisterDTO dto = new RegisterDTO("Bento Clone", "clone@teste.com", "senha123");
 
+        // requisição e esperamos um ERRO (400 Bad Request)
         mockMvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonPayload))
-                .andExpect(status().isOk());
-
-        // Act & Assert: Tenta cadastrar de novo exatamente o mesmo JSON
-        mockMvc.perform(post("/api/v1/auth/register")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonPayload))
-                .andExpect(status().isConflict()); // A nossa BusinessException deve estourar um 400!
+                        .content(objectMapper.writeValueAsString(dto)))
+                .andExpect(status().isConflict());
     }
 
     @Test

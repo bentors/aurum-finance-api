@@ -15,6 +15,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.data.jpa.domain.Specification;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
@@ -147,14 +148,54 @@ public class TransactionService {
     }
 
     @Transactional(readOnly = true)
-    public Page<TransactionResponseDTO> searchTransactions(String description, UUID categoryId, CategoryType type, Pageable pageable) {
+    public Page<TransactionResponseDTO> searchTransactions(
+            String description, UUID categoryId, CategoryType type, LocalDate startDate, LocalDate endDate, Pageable pageable) {
 
         User user = getCurrentUser();
-        // Chama o metodo nativo
-        Page<Transaction> transactions = transactionRepository.searchTransactions(
-                user, description, categoryId, type, pageable
-        );
-        return transactions.map(this::toResponseDTO);
+
+        Specification<Transaction> spec = (root, query, cb) -> {
+            // força o fetch da categoria para evitar N+1
+            if (query.getResultType() != Long.class && query.getResultType() != long.class) {
+                root.fetch("category");
+            }
+            return cb.equal(root.get("user"), user);
+        };
+
+        if (description != null && !description.isBlank()) {
+            spec = spec.and((root, query, cb) ->
+                    cb.like(
+                            cb.lower(root.get("description")),
+                            "%" + description.toLowerCase() + "%"
+                    )
+            );
+        }
+
+        if (categoryId != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("category").get("id"), categoryId)
+            );
+        }
+
+        if (type != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.equal(root.get("category").get("type"), type)
+            );
+        }
+
+        if (startDate != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.greaterThanOrEqualTo(root.get("transactionDate"), startDate)
+            );
+        }
+
+        if (endDate != null) {
+            spec = spec.and((root, query, cb) ->
+                    cb.lessThanOrEqualTo(root.get("transactionDate"), endDate)
+            );
+        }
+
+        return transactionRepository.findAll(spec, pageable )
+                .map(this::toResponseDTO);
     }
 
     @Transactional(readOnly = true)

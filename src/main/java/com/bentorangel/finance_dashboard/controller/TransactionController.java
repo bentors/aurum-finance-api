@@ -107,9 +107,11 @@ public class TransactionController {
             @RequestParam(required = false) String description,
             @RequestParam(required = false) UUID categoryId,
             @RequestParam(required = false) CategoryType type,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @ParameterObject @PageableDefault(sort = "transactionDate", direction = Sort.Direction.DESC) Pageable pageable) {
 
-        Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, pageable);
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, startDate, endDate, pageable);
         return ResponseEntity.ok(result);
     }
 

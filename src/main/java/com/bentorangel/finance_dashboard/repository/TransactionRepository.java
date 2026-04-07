@@ -5,8 +5,10 @@ import com.bentorangel.finance_dashboard.model.Transaction;
 import com.bentorangel.finance_dashboard.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -18,7 +20,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
+public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
+        JpaSpecificationExecutor<Transaction> {
 
     @EntityGraph(attributePaths = {"category"})
     Page<Transaction> findAllByUser(User user, Pageable pageable);
@@ -26,9 +29,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     Optional<Transaction> findByIdAndUser(UUID id, User user);
 
     @EntityGraph(attributePaths = {"category"})
-    Page<Transaction> findByUserAndTransactionDateBetween(User user, LocalDate startDate, LocalDate endDate, Pageable pageable);
+    Page<Transaction> findByUserAndTransactionDateBetween(
+            User user, LocalDate startDate, LocalDate endDate, Pageable pageable);
 
-    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.category.type = :type AND t.transactionDate BETWEEN :startDate AND :endDate AND t.user = :user")
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t " +
+            "WHERE t.category.type = :type " +
+            "AND t.transactionDate BETWEEN :startDate AND :endDate " +
+            "AND t.user = :user")
     BigDecimal sumAmountByCategoryTypeAndPeriodAndUser(
             @Param("type") CategoryType type,
             @Param("startDate") LocalDate startDate,
@@ -37,24 +44,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     );
 
     @EntityGraph(attributePaths = {"category"})
-    List<Transaction> findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(User user, LocalDate startDate, LocalDate endDate);
+    List<Transaction> findAllByUserAndTransactionDateBetweenOrderByTransactionDateDesc(
+            User user, LocalDate startDate, LocalDate endDate);
 
-    // 1. Filtro Avançado
-    // Se o parâmetro vier nulo do front-end, o banco ignora ele e foca nos outros
-    @Query("SELECT t FROM Transaction t WHERE t.user = :user " +
-            "AND (:description IS NULL OR LOWER(t.description) LIKE LOWER(CONCAT('%', :description, '%'))) " +
-            "AND (:categoryId IS NULL OR t.category.id = :categoryId) " +
-            "AND (:type IS NULL OR t.category.type = :type)")
-    @EntityGraph(attributePaths = {"category"})
-    Page<Transaction> searchTransactions(
-            @Param("user") User user,
-            @Param("description") String description,
-            @Param("categoryId") UUID categoryId,
-            @Param("type") CategoryType type,
-            Pageable pageable
-    );
-
-    // 2. Sumário Mensal
     @Query(value = "SELECT EXTRACT(MONTH FROM t.transaction_date) as month, " +
             "SUM(CASE WHEN c.type = 'INCOME' THEN t.amount ELSE 0 END) as income, " +
             "SUM(CASE WHEN c.type = 'EXPENSE' THEN t.amount ELSE 0 END) as expense " +
@@ -71,7 +63,6 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
             @Param("startDate") LocalDate startDate
     );
 
-    // Interface de Projeção: Tabela SQL acima e preenchida pelo Spring
     interface MonthlySummaryProjection {
         Integer getMonth();
         BigDecimal getIncome();

@@ -24,6 +24,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
         JpaSpecificationExecutor<Transaction> {
 
     @EntityGraph(attributePaths = {"category"})
+    Page<Transaction> findAll(Specification<Transaction> spec, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category"})
     Page<Transaction> findAllByUser(User user, Pageable pageable);
 
     Optional<Transaction> findByIdAndUser(UUID id, User user);

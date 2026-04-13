@@ -20,6 +20,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -33,6 +34,7 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.eq;
 
 @ExtendWith(MockitoExtension.class)
 class TransactionServiceTest {
@@ -55,7 +57,6 @@ class TransactionServiceTest {
 
     @BeforeEach
     void setUp() {
-        // 1. Usuário Fake e Contexto de Segurança
         mockUser = new User();
         mockUser.setId(UUID.randomUUID());
         mockUser.setEmail("bento@teste.com");
@@ -63,20 +64,17 @@ class TransactionServiceTest {
         Authentication authentication = mock(Authentication.class);
         SecurityContext securityContext = mock(SecurityContext.class);
 
-        // Usamos lenient() para o Mockito não reclamar se um teste (como o de erro de data) não usar o usuário logado
         lenient().when(securityContext.getAuthentication()).thenReturn(authentication);
         lenient().when(authentication.getPrincipal()).thenReturn(mockUser);
 
         SecurityContextHolder.setContext(securityContext);
 
-        // 2. Categoria Fake (Já que uma transação PRECISA de uma categoria)
         mockCategory = new Category();
         mockCategory.setId(UUID.randomUUID());
         mockCategory.setName("Salário");
         mockCategory.setType(CategoryType.INCOME);
         mockCategory.setUser(mockUser);
 
-        // 3. DTO de Requisição
         requestDTO = new TransactionRequestDTO(
                 "Salário de Março",
                 new BigDecimal("5000.00"),
@@ -88,8 +86,6 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve criar uma transação com sucesso")
     void create_Success() {
-        // Arrange
-        // Ensinamos o CategoryService falso a devolver a nossa categoria falsa
         when(categoryService.getCategoryEntity(mockCategory.getId())).thenReturn(mockCategory);
 
         Transaction savedTransaction = new Transaction();
@@ -102,17 +98,16 @@ class TransactionServiceTest {
 
         when(transactionRepository.save(any(Transaction.class))).thenReturn(savedTransaction);
 
-        // Act
         TransactionResponseDTO result = transactionService.create(requestDTO);
 
-        // Assert
         assertNotNull(result);
         assertEquals("Salário de Março", result.description());
         assertEquals(new BigDecimal("5000.00"), result.amount());
-        assertEquals("Salário", result.category().name()); // Testa se a categoria veio junto no DTO
+        assertEquals("Salário", result.category().name());
 
         verify(categoryService, times(1)).getCategoryEntity(mockCategory.getId());
         verify(transactionRepository, times(1)).save(any(Transaction.class));
+        verify(transactionCacheService, times(1)).evictSummaryCache();
     }
 
     @Test
@@ -141,38 +136,31 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar exceção no Dashboard se a data inicial for maior que a final")
     void getSummary_ThrowsException_WhenStartDateIsAfterEndDate() {
-        // Arrange: Data invertida (Final vem antes da Inicial)
         LocalDate startDate = LocalDate.of(2026, 3, 31);
         LocalDate endDate = LocalDate.of(2026, 3, 1);
 
-        // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class, () -> transactionService.getSummary(startDate, endDate));
 
         assertEquals("A data de início não pode ser posterior à data de fim.", exception.getMessage());
-
-        // Garante que nem tentou bater no banco de dados para fazer contas
-        verify(transactionRepository, never()).sumAmountByCategoryTypeAndPeriodAndUser(any(), any(), any(), any());
+        verify(transactionCacheService, never()).getSummary(any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("Deve buscar todas as transações paginadas do usuário")
     void findAll_Success() {
-        // Arrange
         Transaction transaction = new Transaction();
         transaction.setId(UUID.randomUUID());
         transaction.setDescription("Compra no Mercado");
         transaction.setAmount(new BigDecimal("150.00"));
-        transaction.setCategory(mockCategory); // A categoria falsa lá do setUp()
+        transaction.setCategory(mockCategory);
 
         org.springframework.data.domain.Page<Transaction> mockPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(transaction));
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
 
         when(transactionRepository.findAllByUser(mockUser, pageable)).thenReturn(mockPage);
 
-        // Act
         org.springframework.data.domain.Page<TransactionResponseDTO> result = transactionService.findAll(pageable);
 
-        // Assert
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals("Compra no Mercado", result.getContent().get(0).description());
@@ -182,7 +170,6 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve buscar uma transação por ID com sucesso")
     void findById_Success() {
-        // Arrange
         UUID id = UUID.randomUUID();
         Transaction transaction = new Transaction();
         transaction.setId(id);
@@ -192,10 +179,8 @@ class TransactionServiceTest {
 
         when(transactionRepository.findByIdAndUser(id, mockUser)).thenReturn(java.util.Optional.of(transaction));
 
-        // Act
         TransactionResponseDTO result = transactionService.findById(id);
 
-        // Assert
         assertNotNull(result);
         assertEquals("Conta de Luz", result.description());
     }
@@ -203,11 +188,9 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar erro 404 ao buscar transação que não existe")
     void findById_ThrowsException_WhenNotFound() {
-        // Arrange
         UUID id = UUID.randomUUID();
         when(transactionRepository.findByIdAndUser(id, mockUser)).thenReturn(java.util.Optional.empty());
 
-        // Act & Assert
         com.bentorangel.finance_dashboard.exception.ResourceNotFoundException exception = assertThrows(
                 com.bentorangel.finance_dashboard.exception.ResourceNotFoundException.class,
                 () -> transactionService.findById(id)
@@ -218,7 +201,6 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve atualizar uma transação com sucesso")
     void update_Success() {
-        // Arrange
         UUID id = UUID.randomUUID();
         Transaction existingTransaction = new Transaction();
         existingTransaction.setId(id);
@@ -236,19 +218,17 @@ class TransactionServiceTest {
         when(categoryService.getCategoryEntity(mockCategory.getId())).thenReturn(mockCategory);
         when(transactionRepository.save(any(Transaction.class))).thenReturn(existingTransaction);
 
-        // Act
         TransactionResponseDTO result = transactionService.update(id, updateDto);
 
-        // Assert
         assertNotNull(result);
-        assertEquals("Conta Nova", existingTransaction.getDescription()); // Garante que a entidade foi atualizada antes de salvar
+        assertEquals("Conta Nova", existingTransaction.getDescription());
         verify(transactionRepository, times(1)).save(existingTransaction);
+        verify(transactionCacheService, times(1)).evictSummaryCache();
     }
 
     @Test
     @DisplayName("Deve deletar uma transação com sucesso")
     void delete_Success() {
-        // Arrange
         UUID id = UUID.randomUUID();
         Transaction existingTransaction = new Transaction();
         existingTransaction.setId(id);
@@ -256,29 +236,26 @@ class TransactionServiceTest {
         when(transactionRepository.findByIdAndUser(id, mockUser)).thenReturn(java.util.Optional.of(existingTransaction));
         doNothing().when(transactionRepository).delete(existingTransaction);
 
-        // Act & Assert
         assertDoesNotThrow(() -> transactionService.delete(id));
         verify(transactionRepository, times(1)).delete(existingTransaction);
+        verify(transactionCacheService, times(1)).evictSummaryCache();
     }
 
     @Test
     @DisplayName("Deve buscar transações filtradas por período")
     void findByPeriod_Success() {
-        // Arrange
         LocalDate startDate = LocalDate.of(2026, 3, 1);
         LocalDate endDate = LocalDate.of(2026, 3, 31);
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
 
         Transaction transaction = new Transaction();
-        transaction.setCategory(mockCategory); // Categoria é obrigatória para o DTO
+        transaction.setCategory(mockCategory);
         org.springframework.data.domain.Page<Transaction> mockPage = new org.springframework.data.domain.PageImpl<>(java.util.List.of(transaction));
 
         when(transactionRepository.findByUserAndTransactionDateBetween(mockUser, startDate, endDate, pageable)).thenReturn(mockPage);
 
-        // Act
         org.springframework.data.domain.Page<TransactionResponseDTO> result = transactionService.findByPeriod(startDate, endDate, pageable);
 
-        // Assert
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
     }
@@ -313,12 +290,10 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar exceção na busca por período se a data inicial for maior que a final")
     void findByPeriod_ThrowsException_WhenStartDateIsAfterEndDate() {
-        // Arrange: Datas invertidas
         LocalDate startDate = LocalDate.of(2026, 3, 31);
         LocalDate endDate = LocalDate.of(2026, 3, 1);
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(0, 10);
 
-        // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> transactionService.findByPeriod(startDate, endDate, pageable));
 
@@ -328,11 +303,9 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar exceção na exportação de CSV se a data inicial for maior que a final")
     void exportTransactionsToCsv_ThrowsException_WhenStartDateIsAfterEndDate() {
-        // Arrange: Datas invertidas
         LocalDate startDate = LocalDate.of(2026, 3, 31);
         LocalDate endDate = LocalDate.of(2026, 3, 1);
 
-        // Act & Assert
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> transactionService.exportTransactionsToCsv(startDate, endDate));
 
@@ -342,16 +315,12 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve abortar criação se a categoria for de outro usuário ou não existir")
     void create_ThrowsException_WhenCategoryIsInvalid() {
-        // Arrange
-        // Simula o CategoryService barrando a requisição e lançando o erro
         when(categoryService.getCategoryEntity(requestDTO.categoryId()))
                 .thenThrow(new com.bentorangel.finance_dashboard.exception.ResourceNotFoundException("Categoria não encontrada."));
 
-        // Act & Assert
         assertThrows(com.bentorangel.finance_dashboard.exception.ResourceNotFoundException.class,
                 () -> transactionService.create(requestDTO));
 
-        // Verificação CRÍTICA: Garante que o metodo save() do banco de dados NUNCA foi chamado
         verify(transactionRepository, never()).save(any());
     }
 
@@ -381,22 +350,18 @@ class TransactionServiceTest {
     @Test
     @DisplayName("Deve lançar exceção ao tentar atualizar transação de outro usuário ou inexistente")
     void update_ThrowsException_WhenTransactionNotFound() {
-        // Arrange
         UUID fakeId = UUID.randomUUID();
         when(transactionRepository.findByIdAndUser(fakeId, mockUser)).thenReturn(java.util.Optional.empty());
 
-        // Act & Assert
         assertThrows(com.bentorangel.finance_dashboard.exception.ResourceNotFoundException.class,
                 () -> transactionService.update(fakeId, requestDTO));
 
-        // Garante que não tentou salvar nada
         verify(transactionRepository, never()).save(any());
     }
 
     @Test
     @DisplayName("Deve gerar cache key única por usuário e período")
     void getSummary_CacheKey_IsUniquePerUser() {
-        // dois usuários diferentes, mesmo período — não podem compartilhar cache
         User userA = new User(); userA.setEmail("a@test.com");
         User userB = new User(); userB.setEmail("b@test.com");
         LocalDate start = LocalDate.of(2026, 1, 1);
@@ -408,10 +373,10 @@ class TransactionServiceTest {
         assertNotEquals(keyA, keyB);
     }
 
+
     @Test
     @DisplayName("Deve buscar transações com todos os filtros preenchidos")
     void searchTransactions_WithAllFilters_Success() {
-        // Arrange
         String description = "salário";
         UUID categoryId = mockCategory.getId();
         CategoryType type = CategoryType.INCOME;
@@ -425,50 +390,45 @@ class TransactionServiceTest {
 
         Page<Transaction> mockPage = new PageImpl<>(List.of(transaction));
 
-        when(transactionRepository.searchTransactions(mockUser, description, categoryId, type, pageable))
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(mockPage);
 
-        // Act
-        Page<TransactionResponseDTO> result = transactionService.searchTransactions(description, categoryId, type, pageable);
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(
+                description, categoryId, type, null, null, pageable);
 
-        // Assert
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
         assertEquals("Salário de Março", result.getContent().get(0).description());
-        verify(transactionRepository, times(1)).searchTransactions(mockUser, description, categoryId, type, pageable);
+        verify(transactionRepository, times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
     @DisplayName("Deve buscar transações filtrando apenas por tipo")
     void searchTransactions_WithTypeOnly_Success() {
-        // Arrange
         CategoryType type = CategoryType.EXPENSE;
         Pageable pageable = PageRequest.of(0, 10);
 
         Transaction transaction = new Transaction();
-        transaction.setId(UUID.randomUUID());
         transaction.setDescription("Conta de Luz");
         transaction.setAmount(new BigDecimal("200.00"));
         transaction.setCategory(mockCategory);
 
         Page<Transaction> mockPage = new PageImpl<>(List.of(transaction));
 
-        when(transactionRepository.searchTransactions(mockUser, null, null, type, pageable))
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(mockPage);
 
-        // Act
-        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, null, type, pageable);
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(
+                null, null, type, null, null, pageable);
 
-        // Assert
         assertNotNull(result);
         assertEquals(1, result.getTotalElements());
-        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, null, type, pageable);
+        verify(transactionRepository, times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
-    @DisplayName("Deve retornar todas as transações do usuário quando todos os filtros forem nulos")
+    @DisplayName("Deve retornar todas as transações quando todos os filtros forem nulos")
     void searchTransactions_WithNoFilters_ReturnsAll() {
-        // Arrange
         Pageable pageable = PageRequest.of(0, 10);
 
         Transaction t1 = new Transaction();
@@ -483,35 +443,30 @@ class TransactionServiceTest {
 
         Page<Transaction> mockPage = new PageImpl<>(List.of(t1, t2));
 
-        when(transactionRepository.searchTransactions(mockUser, null, null, null, pageable))
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(mockPage);
 
-        // Act
-        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, null, null, pageable);
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(
+                null, null, null, null, null, pageable);
 
-        // Assert
         assertNotNull(result);
         assertEquals(2, result.getTotalElements());
-        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, null, null, pageable);
+        verify(transactionRepository, times(1)).findAll(any(Specification.class), eq(pageable));
     }
 
     @Test
-    @DisplayName("Deve rejeitar busca com categoryId de outro usuário")
-    void searchTransactions_WithCategoryFromAnotherUser_ThrowsException() {
-        // Arrange
-        UUID foreignCategoryId = UUID.randomUUID(); // ID que não pertence ao mockUser
+    @DisplayName("Deve retornar vazio para categoryId de outro usuário")
+    void searchTransactions_WithForeignCategoryId_ReturnsEmpty() {
+        UUID foreignCategoryId = UUID.randomUUID();
         Pageable pageable = PageRequest.of(0, 10);
 
-        // O repositório não encontra nada — simula o comportamento do filtro por usuário na query
-        when(transactionRepository.searchTransactions(mockUser, null, foreignCategoryId, null, pageable))
+        when(transactionRepository.findAll(any(Specification.class), eq(pageable)))
                 .thenReturn(Page.empty());
 
-        // Act
-        Page<TransactionResponseDTO> result = transactionService.searchTransactions(null, foreignCategoryId, null, pageable);
+        Page<TransactionResponseDTO> result = transactionService.searchTransactions(
+                null, foreignCategoryId, null, null, null, pageable);
 
-        // Assert
-        assertTrue(result.isEmpty()); // não lança exceção, simplesmente retorna vazio
-        verify(transactionRepository, times(1)).searchTransactions(mockUser, null, foreignCategoryId, null, pageable);
+        assertTrue(result.isEmpty());
+        verify(transactionRepository, times(1)).findAll(any(Specification.class), eq(pageable));
     }
-
 }

@@ -7,7 +7,7 @@ import io.github.bucket4j.Bucket;
 import io.github.bucket4j.Refill;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value; // <-- Importante adicionar isso
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
@@ -40,8 +40,8 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             return true;
         }
 
-        // Pega o IP de quem está fazendo a requisição
-        String ip = request.getRemoteAddr();
+        // Lê o IP real do cliente, considerando proxies e load balancers (ex: AWS ALB, Nginx)
+        String ip = resolveClientIp(request);
 
         Bucket bucket = cache.get(ip, k -> createNewBucket());
 
@@ -54,5 +54,14 @@ public class RateLimitInterceptor implements HandlerInterceptor {
             response.getWriter().write("Too many requests. Please try again later.");
             return false;
         }
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        if (forwarded != null && !forwarded.isBlank()) {
+            // Pega apenas o primeiro IP da cadeia
+            return forwarded.split(",")[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 }

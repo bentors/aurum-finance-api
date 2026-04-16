@@ -54,20 +54,20 @@ public class CategoryService {
                 .map(this::toResponseDTO);
     }
 
-    @Cacheable(value = "categoria", key = "#id")
+    @Cacheable(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     @Transactional(readOnly = true)
     public CategoryResponseDTO findById(UUID id) {
         return toResponseDTO(getCategoryEntity(id));
     }
 
-    @CacheEvict(value = "categoria", key = "#id")
+    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     @Transactional
     public void delete(UUID id) {
         Category category = getCategoryEntity(id);
         categoryRepository.delete(category);
     }
 
-    @CacheEvict(value = "categoria", key = "#id")
+    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
     @Transactional
     public CategoryResponseDTO update(UUID id, CategoryRequestDTO dto) {
         User user = getCurrentUser();
@@ -84,7 +84,7 @@ public class CategoryService {
         return toResponseDTO(categoryRepository.save(category));
     }
 
-    // Só acha se for do usuário logado!
+    // Só acha se for do usuário logado
     public Category getCategoryEntity(UUID id) {
         return categoryRepository.findByIdAndUser(id, getCurrentUser())
                 .orElseThrow(() -> new ResourceNotFoundException("Categoria não encontrada ou não pertence a você."));

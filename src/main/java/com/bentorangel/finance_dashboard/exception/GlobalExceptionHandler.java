@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // Quando qualquer Service lançar ResourceNotFoundException, ele cai aqui
+    // Quando qualquer Service lançar ResourceNotFoundException
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleResourceNotFound(ResourceNotFoundException ex, HttpServletRequest request) {
 
@@ -82,12 +82,12 @@ public class GlobalExceptionHandler {
 
         ErrorResponse error = new ErrorResponse(
                 LocalDateTime.now(),
-                HttpStatus.FORBIDDEN.value(), // 403 - Acesso Negado
-                "Acesso Negado",
+                HttpStatus.UNAUTHORIZED.value(), // 401 - Falha de autenticação (email/senha incorretos)
+                "Unauthorized",
                 "E-mail ou senha incorretos.",
                 request.getRequestURI()
         );
 
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(error);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(error);
     }
 }

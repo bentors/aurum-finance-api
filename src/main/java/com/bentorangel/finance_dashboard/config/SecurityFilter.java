@@ -27,12 +27,13 @@ public class SecurityFilter extends OncePerRequestFilter {
         var token = this.recoverToken(request);
         if (token != null) {
             var email = tokenService.validateToken(token);
-            UserDetails user = userRepository.findByEmail(email);
-
-            if (user != null) {
-                // Se o token for válido e o usuário existir, liberação para o Spring Security deixar passar
-                var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
-                SecurityContextHolder.getContext().setAuthentication(authentication);
+            if (email != null) { // null = token inválido, vencido ou adulterado
+                UserDetails user = userRepository.findByEmail(email);
+                if (user != null) {
+                    // Se o token for válido e o usuário existir, liberação para o Spring Security deixar passar
+                    var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             }
         }
         filterChain.doFilter(request, response);

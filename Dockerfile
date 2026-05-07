@@ -11,4 +11,4 @@ COPY --from=build /app/target/*.jar app.jar
 
 EXPOSE 8080
 # Configurações de memória para o plano gratuito do Render (512MB)
-ENTRYPOINT ["java", "-Xmx300m", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -Xmx300m -Dserver.port=${PORT:-8080} -jar app.jar"]

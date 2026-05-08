@@ -12,7 +12,9 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -26,6 +28,7 @@ public class AuthService {
         var credentials = new UsernamePasswordAuthenticationToken(data.email(), data.password());
         var auth = authenticationManager.authenticate(credentials);
         User user = (User) auth.getPrincipal();
+        log.info("Login realizado: {}", data.email());
         return new TokenResponseDTO(user.getName(), tokenService.generateToken(user));
     }
 
@@ -40,5 +43,6 @@ public class AuthService {
                 .password(passwordEncoder.encode(data.password()))
                 .build();
         userRepository.save(newUser);
+        log.info("Novo usuário registrado: {}", data.email());
     }
 }

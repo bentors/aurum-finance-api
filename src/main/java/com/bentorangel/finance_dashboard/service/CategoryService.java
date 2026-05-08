@@ -45,7 +45,9 @@ public class CategoryService {
                 .user(user)
                 .build();
 
-        return toResponseDTO(categoryRepository.save(category));
+        CategoryResponseDTO response = toResponseDTO(categoryRepository.save(category));
+        log.info("Categoria criada: '{}' | Usuário: {}", dto.name(), user.getUsername()); // ADD
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -65,6 +67,7 @@ public class CategoryService {
     public void delete(UUID id) {
         Category category = getCategoryEntity(id);
         categoryRepository.delete(category);
+        log.info("Categoria deletada: {} | Usuário: {}", id, getCurrentUser().getUsername());
     }
 
     @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
@@ -81,7 +84,9 @@ public class CategoryService {
         category.setName(dto.name());
         category.setType(dto.type());
 
-        return toResponseDTO(categoryRepository.save(category));
+        CategoryResponseDTO response = toResponseDTO(categoryRepository.save(category));
+        log.info("Categoria atualizada: {} -> '{}' | Usuário: {}", id, dto.name(), user.getUsername()); // ADD
+        return response;
     }
 
     // Só acha se for do usuário logado

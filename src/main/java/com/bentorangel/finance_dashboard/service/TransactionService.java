@@ -37,18 +37,20 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO create(TransactionRequestDTO dto) {
-        Category category = categoryService.getCategoryEntity(dto.categoryId()); // Valida se a categoria é do usuário
+        User user = getCurrentUser();
+        Category category = categoryService.getCategoryEntity(dto.categoryId());
 
         Transaction transaction = Transaction.builder()
                 .description(dto.description())
                 .amount(dto.amount())
                 .transactionDate(dto.transactionDate())
                 .category(category)
-                .user(getCurrentUser())
+                .user(user)
                 .build();
 
         TransactionResponseDTO response = toResponseDTO(transactionRepository.save(transaction));
-        transactionCacheService.evictSummaryCache(); // invalida após salvar
+        transactionCacheService.evictSummaryCache();
+        log.info("Transação criada: '{}' | Usuário: {}", dto.description(), user.getUsername());
         return response;
     }
 
@@ -60,6 +62,7 @@ public class TransactionService {
 
     @Transactional
     public TransactionResponseDTO update(UUID id, TransactionRequestDTO dto) {
+        User user = getCurrentUser();
         Transaction transaction = getTransactionEntity(id);
         Category category = categoryService.getCategoryEntity(dto.categoryId());
 
@@ -69,7 +72,8 @@ public class TransactionService {
         transaction.setCategory(category);
 
         TransactionResponseDTO response = toResponseDTO(transactionRepository.save(transaction));
-        transactionCacheService.evictSummaryCache(); // invalida após atualizar
+        transactionCacheService.evictSummaryCache();
+        log.info("Transação atualizada: {} | Usuário: {}", id, user.getUsername());
         return response;
     }
 
@@ -80,9 +84,11 @@ public class TransactionService {
 
     @Transactional
     public void delete(UUID id) {
+        User user = getCurrentUser();
         Transaction transaction = getTransactionEntity(id);
         transactionRepository.delete(transaction);
         transactionCacheService.evictSummaryCache();
+        log.info("Transação deletada: {} | Usuário: {}", id, user.getUsername());
     }
 
     @Transactional(readOnly = true)

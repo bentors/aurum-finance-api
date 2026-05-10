@@ -18,7 +18,9 @@ public class TransactionCacheService {
 
     private final TransactionRepository transactionRepository;
 
-    @Cacheable(value = "dashboardSummary", key = "#userEmail + '-' + #startDate + '-' + #endDate")
+    @Cacheable(value = "dashboardSummary",
+            key = "#userEmail + '-' + #startDate + '-' + #endDate",
+            cacheManager = "dashboardCacheManager")
     public DashboardSummaryDTO getSummary(String userEmail, LocalDate startDate, LocalDate endDate, User user) {
         BigDecimal rawIncome  = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.INCOME,  startDate, endDate, user);
         BigDecimal rawExpense = transactionRepository.sumAmountByCategoryTypeAndPeriodAndUser(CategoryType.EXPENSE, startDate, endDate, user);
@@ -29,7 +31,7 @@ public class TransactionCacheService {
         return new DashboardSummaryDTO(totalIncome, totalExpense, totalIncome.subtract(totalExpense));
     }
 
-    @CacheEvict(value = "dashboardSummary", allEntries = true)
+    @CacheEvict(value = "dashboardSummary", allEntries = true, cacheManager = "dashboardCacheManager")
     public void evictSummaryCache() {
     }
 }

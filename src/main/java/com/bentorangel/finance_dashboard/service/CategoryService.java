@@ -56,13 +56,15 @@ public class CategoryService {
                 .map(this::toResponseDTO);
     }
 
-    @Cacheable(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
+    @Cacheable(value = "categoria",
+            key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()",
+            cacheManager = "categoriaCacheManager")
     @Transactional(readOnly = true)
     public CategoryResponseDTO findById(UUID id) {
         return toResponseDTO(getCategoryEntity(id));
     }
 
-    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
+    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()", cacheManager = "categoriaCacheManager")
     @Transactional
     public void delete(UUID id) {
         Category category = getCategoryEntity(id);
@@ -70,7 +72,7 @@ public class CategoryService {
         log.info("Categoria deletada: {} | Usuário: {}", id, getCurrentUser().getUsername());
     }
 
-    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()")
+    @CacheEvict(value = "categoria", key = "#id + '-' + T(org.springframework.security.core.context.SecurityContextHolder).getContext().getAuthentication().getName()", cacheManager = "categoriaCacheManager")
     @Transactional
     public CategoryResponseDTO update(UUID id, CategoryRequestDTO dto) {
         User user = getCurrentUser();

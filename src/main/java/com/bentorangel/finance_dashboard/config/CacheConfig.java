@@ -6,6 +6,7 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.cache.caffeine.CaffeineCacheManager;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
 
 import java.util.concurrent.TimeUnit;
 
@@ -13,12 +14,33 @@ import java.util.concurrent.TimeUnit;
 @EnableCaching
 public class CacheConfig {
 
-    @Bean
-    public CacheManager cacheManager() {
-        CaffeineCacheManager cacheManager = new CaffeineCacheManager();
-        cacheManager.setCaffeine(Caffeine.newBuilder()
-                .expireAfterWrite(60, TimeUnit.MINUTES) // Expira após 1h
-                .maximumSize(1000)); // Limita a 1000 itens na memória
-        return cacheManager;
+    /**
+     * Cache para o resumo do dashboard (dados financeiros agregados).
+     * TTL curto (5 min) porque muda a cada transação criada/editada/removida.
+     * Marcado como @Primary para ser o CacheManager padrão do Spring,
+     * evitando NoUniqueBeanDefinitionException quando há múltiplos CacheManagers.
+     */
+    @Bean("dashboardCacheManager")
+    @Primary
+    public CacheManager dashboardCacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager("dashboardSummary");
+        manager.setCaffeine(Caffeine.newBuilder()
+                .expireAfterWrite(5, TimeUnit.MINUTES)
+                .maximumSize(500));
+        return manager;
+    }
+
+    /**
+     * Cache para categorias individuais por ID.
+     * TTL longo (60 min) porque categorias raramente mudam após criadas.
+     * O @CacheEvict em CategoryService invalida manualmente em updates/deletes.
+     */
+    @Bean("categoriaCacheManager")
+    public CacheManager categoriaCacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager("categoria");
+        manager.setCaffeine(Caffeine.newBuilder()
+                .expireAfterWrite(60, TimeUnit.MINUTES)
+                .maximumSize(1_000));
+        return manager;
     }
 }

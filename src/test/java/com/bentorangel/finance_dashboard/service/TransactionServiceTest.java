@@ -4,6 +4,7 @@ import com.bentorangel.finance_dashboard.dto.DashboardSummaryDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionRequestDTO;
 import com.bentorangel.finance_dashboard.dto.TransactionResponseDTO;
 import com.bentorangel.finance_dashboard.exception.BusinessException;
+import org.springframework.http.HttpStatus;
 import com.bentorangel.finance_dashboard.model.Category;
 import com.bentorangel.finance_dashboard.model.CategoryType;
 import com.bentorangel.finance_dashboard.model.Transaction;
@@ -134,14 +135,17 @@ class TransactionServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar exceção no Dashboard se a data inicial for maior que a final")
+    @DisplayName("Deve lançar BusinessException (400) quando data inicial for posterior à data final")
     void getSummary_ThrowsException_WhenStartDateIsAfterEndDate() {
         LocalDate startDate = LocalDate.of(2026, 3, 31);
         LocalDate endDate = LocalDate.of(2026, 3, 1);
 
-        BusinessException exception = assertThrows(BusinessException.class, () -> transactionService.getSummary(startDate, endDate));
+        BusinessException exception = assertThrows(BusinessException.class,
+                () -> transactionService.getSummary(startDate, endDate));
 
         assertEquals("A data de início não pode ser posterior à data de fim.", exception.getMessage());
+        // Garante que a exceção carrega o status correto (400, não 409)
+        assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
         verify(transactionCacheService, never()).getSummary(any(), any(), any(), any());
     }
 

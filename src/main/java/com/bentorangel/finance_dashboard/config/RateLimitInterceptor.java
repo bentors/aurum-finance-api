@@ -21,47 +21,75 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     @Value("${app.security.rate-limit.enabled:true}")
     private boolean rateLimitEnabled;
 
-    // 1. Caffeine Cache
+    /**
+     * Lista de IPs de proxies/load-balancers confiáveis (ex: AWS ALB, Nginx interno).
+     * Apenas quando a requisição vier de um desses IPs é que o X-Forwarded-For
+     * será considerado confiável para identificar o cliente real.
+     * Em desenvolvimento/localhost, esta lista pode ficar vazia.
+     */
+    @Value("${app.security.rate-limit.trusted-proxies:}")
+    private String[] trustedProxies;
+
+    // Cache de baldes por IP. Expira após 1h sem uso para liberar memória.
     private final Cache<String, Bucket> cache = Caffeine.newBuilder()
             .expireAfterAccess(1, TimeUnit.HOURS)
-            .maximumSize(10000)
+            .maximumSize(10_000)
             .build();
 
-    // 20 requisições a cada 1 minuto
+    /** 20 requisições por minuto por IP. */
     private Bucket createNewBucket() {
         Bandwidth limit = Bandwidth.classic(20, Refill.greedy(20, Duration.ofMinutes(1)));
         return Bucket.builder().addLimit(limit).build();
     }
 
     @Override
-    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+    public boolean preHandle(HttpServletRequest request,
+                             HttpServletResponse response,
+                             Object handler) throws Exception {
 
         if (!rateLimitEnabled) {
             return true;
         }
 
-        // Lê o IP real do cliente, considerando proxies e load balancers (ex: AWS ALB, Nginx)
         String ip = resolveClientIp(request);
-
         Bucket bucket = cache.get(ip, k -> createNewBucket());
 
-        // Tenta consumir 1 ficha do balde
         if (bucket != null && bucket.tryConsume(1)) {
-            return true; // Tem ficha? Pode passar
-        } else {
-            // Acabou a ficha? Bloqueia com erro 429
-            response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
-            response.getWriter().write("Too many requests. Please try again later.");
-            return false;
+            return true;
         }
+
+        response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
+        response.getWriter().write("Too many requests. Please try again later.");
+        return false;
     }
 
+    /**
+     * Resolve o IP real do cliente de forma segura.
+     *
+     * O header X-Forwarded-For é controlado pelo cliente e pode ser forjado.
+     * Só deve ser lido se a requisição vier de um proxy confiável configurado
+     * explicitamente em {@code app.security.rate-limit.trusted-proxies}.
+     *
+     * Em produção com AWS ALB ou Nginx, adicione o IP do load balancer
+     * à lista de trusted-proxies nas variáveis de ambiente.
+     */
     private String resolveClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            // Pega apenas o primeiro IP da cadeia
-            return forwarded.split(",")[0].trim();
+        String remoteAddr = request.getRemoteAddr();
+
+        if (trustedProxies != null && trustedProxies.length > 0) {
+            for (String trustedProxy : trustedProxies) {
+                if (trustedProxy.trim().equals(remoteAddr)) {
+                    // Requisição veio de um proxy confiável — lemos o header com segurança
+                    String forwarded = request.getHeader("X-Forwarded-For");
+                    if (forwarded != null && !forwarded.isBlank()) {
+                        return forwarded.split(",")[0].trim();
+                    }
+                    break;
+                }
+            }
         }
-        return request.getRemoteAddr();
+
+        // Caso padrão: usa o IP direto da conexão TCP (não pode ser forjado)
+        return remoteAddr;
     }
 }

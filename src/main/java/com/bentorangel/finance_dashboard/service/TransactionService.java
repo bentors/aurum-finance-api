@@ -1,8 +1,10 @@
 package com.bentorangel.finance_dashboard.service;
 
 import com.bentorangel.finance_dashboard.dto.*;
+import com.bentorangel.finance_dashboard.dto.MonthlySummaryProjection;
 import com.bentorangel.finance_dashboard.exception.BusinessException;
 import com.bentorangel.finance_dashboard.exception.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import com.bentorangel.finance_dashboard.model.Category;
 import com.bentorangel.finance_dashboard.model.CategoryType;
 import com.bentorangel.finance_dashboard.model.Transaction;
@@ -94,7 +96,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public Page<TransactionResponseDTO> findByPeriod(LocalDate startDate, LocalDate endDate, Pageable pageable) {
         if (startDate.isAfter(endDate)) {
-            throw new BusinessException("A data de início não pode ser posterior à data de fim.");
+            throw new BusinessException("A data de início não pode ser posterior à data de fim.", HttpStatus.BAD_REQUEST);
         }
         return transactionRepository.findByUserAndTransactionDateBetween(getCurrentUser(), startDate, endDate, pageable)
                 .map(this::toResponseDTO);
@@ -103,7 +105,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public DashboardSummaryDTO getSummary(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
-            throw new BusinessException("A data de início não pode ser posterior à data de fim.");
+            throw new BusinessException("A data de início não pode ser posterior à data de fim.", HttpStatus.BAD_REQUEST);
         }
         User user = getCurrentUser();
         return transactionCacheService.getSummary(user.getUsername(), startDate, endDate, user);
@@ -131,7 +133,7 @@ public class TransactionService {
     @Transactional(readOnly = true)
     public byte[] exportTransactionsToCsv(LocalDate startDate, LocalDate endDate) {
         if (startDate.isAfter(endDate)) {
-            throw new BusinessException("A data de início não pode ser posterior à data de fim.");
+            throw new BusinessException("A data de início não pode ser posterior à data de fim.", HttpStatus.BAD_REQUEST);
         }
 
         List<Transaction> transactions = transactionRepository

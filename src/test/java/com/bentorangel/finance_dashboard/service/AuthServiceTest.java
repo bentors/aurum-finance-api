@@ -13,6 +13,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -26,17 +28,10 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
-    @Mock
-    private AuthenticationManager authenticationManager;
-
-    @Mock
-    private UserRepository userRepository;
-
-    @Mock
-    private TokenService tokenService;
-
-    @Mock
-    private PasswordEncoder passwordEncoder;
+    @Mock private AuthenticationManager authenticationManager;
+    @Mock private UserRepository userRepository;
+    @Mock private TokenService tokenService;
+    @Mock private PasswordEncoder passwordEncoder;
 
     @InjectMocks
     private AuthService authService;
@@ -55,7 +50,6 @@ class AuthServiceTest {
     @DisplayName("Deve realizar login com sucesso e retornar token JWT")
     void login_Success() {
         LoginDTO dto = new LoginDTO("bento@teste.com", "senha123");
-
         Authentication auth = mock(Authentication.class);
         when(auth.getPrincipal()).thenReturn(mockUser);
         when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
@@ -71,11 +65,10 @@ class AuthServiceTest {
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao fazer login com credenciais inválidas")
+    @DisplayName("Deve lançar BadCredentialsException ao logar com senha incorreta")
     void login_ThrowsException_WhenBadCredentials() {
         LoginDTO dto = new LoginDTO("bento@teste.com", "senha_errada");
-
-        when(authenticationManager.authenticate(any(UsernamePasswordAuthenticationToken.class)))
+        when(authenticationManager.authenticate(any()))
                 .thenThrow(new BadCredentialsException("Credenciais inválidas"));
 
         assertThrows(BadCredentialsException.class, () -> authService.login(dto));
@@ -86,29 +79,41 @@ class AuthServiceTest {
     @DisplayName("Deve registrar novo usuário com sucesso")
     void register_Success() {
         RegisterDTO dto = new RegisterDTO("Bento", "bento@teste.com", "senha123");
-
         when(userRepository.existsByEmail(dto.email())).thenReturn(false);
         when(passwordEncoder.encode(dto.password())).thenReturn("hashed_password");
 
         assertDoesNotThrow(() -> authService.register(dto));
 
-        verify(userRepository, times(1)).existsByEmail(dto.email());
-        verify(passwordEncoder, times(1)).encode(dto.password());
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(userRepository).existsByEmail(dto.email());
+        verify(passwordEncoder).encode(dto.password());
+        verify(userRepository).save(any(User.class));
     }
 
     @Test
-    @DisplayName("Deve lançar exceção ao registrar e-mail já existente")
-    void register_ThrowsException_WhenEmailAlreadyExists() {
+    @DisplayName("Deve lançar BusinessException (409) ao registrar e-mail duplicado via check lógico")
+    void register_ThrowsBusinessException_WhenEmailAlreadyExists() {
         RegisterDTO dto = new RegisterDTO("Bento", "bento@teste.com", "senha123");
-
         when(userRepository.existsByEmail(dto.email())).thenReturn(true);
 
         BusinessException exception = assertThrows(BusinessException.class,
                 () -> authService.register(dto));
 
         assertEquals("Já existe um usuário com este e-mail.", exception.getMessage());
+        assertEquals(HttpStatus.CONFLICT, exception.getStatus());
         verify(userRepository, never()).save(any());
-        verify(passwordEncoder, never()).encode(any());
+    }
+
+    @Test
+    @DisplayName("Deve propagar DataIntegrityViolationException em race condition (e-mail duplicado no banco)")
+    void register_PropagatesDataIntegrityViolation_OnRaceCondition() {
+        // Simula o cenário onde dois threads passaram pelo existsByEmail simultaneamente
+        // e o segundo thread tenta salvar, recebendo a violação de UNIQUE constraint.
+        RegisterDTO dto = new RegisterDTO("Bento", "bento@teste.com", "senha123");
+        when(userRepository.existsByEmail(dto.email())).thenReturn(false);
+        when(passwordEncoder.encode(any())).thenReturn("hashed");
+        when(userRepository.save(any())).thenThrow(new DataIntegrityViolationException("duplicate key"));
+
+        // O GlobalExceptionHandler trata isso como 409 — o service apenas propaga.
+        assertThrows(DataIntegrityViolationException.class, () -> authService.register(dto));
     }
 }

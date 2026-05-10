@@ -23,25 +23,40 @@ public class SecurityFilter extends OncePerRequestFilter {
     private final UserRepository userRepository;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        var token = this.recoverToken(request);
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain) throws ServletException, IOException {
+
+        String token = recoverToken(request);
+
         if (token != null) {
-            var email = tokenService.validateToken(token);
-            if (email != null) { // null = token inválido, vencido ou adulterado
+            String email = tokenService.validateToken(token);
+
+            // email == null significa token inválido, vencido ou adulterado
+            if (email != null) {
                 UserDetails user = userRepository.findByEmail(email);
+
                 if (user != null) {
-                    // Se o token for válido e o usuário existir, liberação para o Spring Security deixar passar
-                    var authentication = new UsernamePasswordAuthenticationToken(user, null, user.getAuthorities());
+                    var authentication = new UsernamePasswordAuthenticationToken(
+                            user, null, user.getAuthorities());
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             }
         }
+
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Extrai o token JWT do header Authorization.
+     * Usa startsWith + substring para ser resistente a variações de capitalização
+     * e espaços extras que o replace() simples não detecta.
+     */
     private String recoverToken(HttpServletRequest request) {
-        var authHeader = request.getHeader("Authorization");
-        if (authHeader == null) return null;
-        return authHeader.replace("Bearer ", ""); // Remove a palavra Bearer para pegar só o código do token
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authHeader.substring(7); // Remove exatamente "Bearer " (7 caracteres)
     }
 }

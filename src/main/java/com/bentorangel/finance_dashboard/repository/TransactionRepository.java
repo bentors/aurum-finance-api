@@ -1,5 +1,6 @@
 package com.bentorangel.finance_dashboard.repository;
 
+import com.bentorangel.finance_dashboard.dto.MonthlySummaryProjection;
 import com.bentorangel.finance_dashboard.model.CategoryType;
 import com.bentorangel.finance_dashboard.model.Transaction;
 import com.bentorangel.finance_dashboard.model.User;
@@ -29,6 +30,9 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
     @EntityGraph(attributePaths = {"category"})
     Page<Transaction> findAllByUser(User user, Pageable pageable);
 
+    // EntityGraph adicionado para evitar LazyInitializationException ao acessar
+    // transaction.getCategory() dentro de toResponseDTO()
+    @EntityGraph(attributePaths = {"category"})
     Optional<Transaction> findByIdAndUser(UUID id, User user);
 
     @EntityGraph(attributePaths = {"category"})
@@ -65,10 +69,4 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
             @Param("userId") UUID userId,
             @Param("startDate") LocalDate startDate
     );
-
-    interface MonthlySummaryProjection {
-        Integer getMonth();
-        BigDecimal getIncome();
-        BigDecimal getExpense();
-    }
 }

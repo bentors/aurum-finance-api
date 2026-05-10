@@ -138,4 +138,23 @@ class AuthControllerIntegrationTest {
                         .content(loginPayload))
                 .andExpect(status().isForbidden());
     }
+    @Test
+    @DisplayName("Deve retornar 400 com TODOS os erros de campo quando multiplos campos invalidos")
+    void register_Fails_WithMultipleValidationErrors() throws Exception {
+        // Arrange: DTO com nome vazio, e-mail malformado e senha curta
+        RegisterDTO dto = new RegisterDTO("", "email-invalido", "12");
+        String jsonPayload = objectMapper.writeValueAsString(dto);
+
+        // Act & Assert: espera 400 com o mapa de fieldErrors no body
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(jsonPayload))
+                .andExpect(status().isBadRequest())
+                // Garante que a resposta contem o campo fieldErrors (mapa de erros)
+                .andExpect(jsonPath("$.fieldErrors").isMap())
+                // Garante que os tres campos invalidos estao presentes
+                .andExpect(jsonPath("$.fieldErrors.name").exists())
+                .andExpect(jsonPath("$.fieldErrors.email").exists())
+                .andExpect(jsonPath("$.fieldErrors.password").exists());
+    }
 }
